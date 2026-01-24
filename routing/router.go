@@ -1,13 +1,11 @@
 package quick
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
 )
 
 type route struct {
-	url     string
+	path    string
 	method  string
 	handler http.HandlerFunc
 }
@@ -20,8 +18,8 @@ type router struct {
 
 func NewRouter() *router {
 	return &router{
-		routes:  make([]route, 0),
-		routers: make(map[string]*router, 0),
+		routes:  []route{},
+		routers: map[string]*router{},
 	}
 }
 
@@ -29,18 +27,13 @@ func (r *router) UseRouter(path string, ro *router) {
 	r.routers[path] = ro
 }
 
-func (r *router) getRoutes() map[string]http.HandlerFunc {
-	mountedRoutes := make(map[string]http.HandlerFunc)
-	for _, ro := range r.routes {
-		patt := fmt.Sprintf("%s %s", ro.method, ro.url)
-		mountedRoutes[patt] = ro.handler
-	}
+func (r *router) getRoutes() []route {
+	mountedRoutes := r.routes[:]
 	for path, rtr := range r.routers {
 		rtrRoutes := rtr.getRoutes()
-		for k, v := range rtrRoutes {
-			parts := strings.Split(k, " ")
-			patt := fmt.Sprintf("%s %s%s", parts[0], path, parts[1])
-			mountedRoutes[patt] = v
+		for _, v := range rtrRoutes {
+			v.path = path + v.path
+			mountedRoutes = append(mountedRoutes, v)
 		}
 	}
 	return mountedRoutes
@@ -48,10 +41,10 @@ func (r *router) getRoutes() map[string]http.HandlerFunc {
 
 /*** Basic HTTP Methods ***/
 
-func (r *router) Get(url string, handler http.HandlerFunc) {
+func (r *router) Get(path string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "GET",
-		url:     url,
+		path:    path,
 		handler: handler,
 	})
 }
@@ -59,7 +52,7 @@ func (r *router) Get(url string, handler http.HandlerFunc) {
 func (r *router) Post(url string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "POST",
-		url:     url,
+		path:    url,
 		handler: handler,
 	})
 }
@@ -67,7 +60,7 @@ func (r *router) Post(url string, handler http.HandlerFunc) {
 func (r *router) Put(url string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "PUT",
-		url:     url,
+		path:    url,
 		handler: handler,
 	})
 }
@@ -75,7 +68,7 @@ func (r *router) Put(url string, handler http.HandlerFunc) {
 func (r *router) Delete(url string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "DELETE",
-		url:     url,
+		path:    url,
 		handler: handler,
 	})
 }

@@ -3,7 +3,6 @@ package quick
 import (
 	"fmt"
 	"net/http"
-	"strings"
 )
 
 type App struct {
@@ -35,11 +34,9 @@ func (a *App) Listen(addr string) {
 func (a *App) setUpRouters() {
 	for p, ro := range a.routers {
 		rts := ro.getRoutes()
-		for k, v := range rts {
-			parts := strings.Split(k, " ")
-			patt := fmt.Sprintf("%s %s%s", parts[0], p, parts[1])
-			a.handler.HandleFunc(patt, v)
-			fmt.Println(patt)
+		for _, v := range rts {
+			patt := fmt.Sprintf("%s %s%s", v.method, p, v.path)
+			a.handler.HandleFunc(patt, v.handler)
 		}
 	}
 }
