@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	quick "github.com/LucasSim0n/quick/routing"
@@ -29,5 +30,9 @@ func main() {
 
 	app.UseRouter("/router", r)
 
-	app.Listen(":8080")
+	err := app.Listen(":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }

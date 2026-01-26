@@ -10,30 +10,40 @@ type route struct {
 	handler http.HandlerFunc
 }
 
+// TODO: Cambiar los mapas por arrays -> orden determinista
 type router struct {
-	url     string
 	routes  []route
-	routers map[string]*router
+	routers []mountedRouter
+}
+
+type mountedRouter struct {
+	path   string
+	router *router
 }
 
 func NewRouter() *router {
 	return &router{
 		routes:  []route{},
-		routers: map[string]*router{},
+		routers: []mountedRouter{},
 	}
 }
 
 func (r *router) UseRouter(path string, ro *router) {
-	r.routers[path] = ro
+	for _, mr := range r.routers {
+		if mr.path == path {
+			return
+		}
+	}
+	r.routers = append(r.routers, mountedRouter{path: path, router: ro})
 }
 
 func (r *router) getRoutes() []route {
-	mountedRoutes := r.routes[:]
-	for path, rtr := range r.routers {
-		rtrRoutes := rtr.getRoutes()
-		for _, v := range rtrRoutes {
-			v.path = path + v.path
-			mountedRoutes = append(mountedRoutes, v)
+	mountedRoutes := append([]route{}, r.routes...)
+	for _, mr := range r.routers {
+		rtrRoutes := mr.router.getRoutes()
+		for _, rt := range rtrRoutes {
+			rt.path = mr.path + rt.path
+			mountedRoutes = append(mountedRoutes, rt)
 		}
 	}
 	return mountedRoutes
@@ -49,26 +59,26 @@ func (r *router) Get(path string, handler http.HandlerFunc) {
 	})
 }
 
-func (r *router) Post(url string, handler http.HandlerFunc) {
+func (r *router) Post(path string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "POST",
-		path:    url,
+		path:    path,
 		handler: handler,
 	})
 }
 
-func (r *router) Put(url string, handler http.HandlerFunc) {
+func (r *router) Put(path string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "PUT",
-		path:    url,
+		path:    path,
 		handler: handler,
 	})
 }
 
-func (r *router) Delete(url string, handler http.HandlerFunc) {
+func (r *router) Delete(path string, handler http.HandlerFunc) {
 	r.routes = append(r.routes, route{
 		method:  "DELETE",
-		path:    url,
+		path:    path,
 		handler: handler,
 	})
 }
