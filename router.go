@@ -1,21 +1,17 @@
 package cafe
 
-import (
-	"net/http"
-)
-
 /*** Definitions ***/
-
-type route struct {
-	path    string
-	method  string
-	handler http.HandlerFunc
-}
 
 type Router struct {
 	routes      []route
 	routers     []mountedRouter
-	middlewares []middleware
+	middlewares []Middleware
+}
+
+type route struct {
+	path    string
+	method  string
+	handler HandlerFunc
 }
 
 type mountedRouter struct {
@@ -43,43 +39,46 @@ func (r *Router) UseRouter(path string, ro *Router) {
 	r.routers = append(r.routers, mountedRouter{path: path, router: ro})
 }
 
-func (r *Router) Use(mw middleware) {
+func (r *Router) Use(mw Middleware) {
 	r.middlewares = append(r.middlewares, mw)
-}
-
-/*** Assembly ***/
-
-func (r *Router) getRoutes() []route {
-	mountedRoutes := []route{}
-	for _, rt := range r.routes {
-		rt.handler = setUpMiddlewares(rt.handler, r.middlewares)
-		mountedRoutes = append(mountedRoutes, rt)
-	}
-	for _, mr := range r.routers {
-		rtrRoutes := mr.router.getRoutes()
-		for _, rt := range rtrRoutes {
-			rt.path = mr.path + rt.path
-			rt.handler = setUpMiddlewares(rt.handler, r.middlewares)
-			mountedRoutes = append(mountedRoutes, rt)
-		}
-	}
-	return mountedRoutes
 }
 
 /*** Basic HTTP Methods ***/
 
-func (r *Router) Get(path string, handler http.HandlerFunc) {
+func (r *Router) Get(path string, handler HandlerFunc) {
 	r.routes = addRoute(r.routes, path, "GET", handler)
 }
 
-func (r *Router) Post(path string, handler http.HandlerFunc) {
+func (r *Router) Post(path string, handler HandlerFunc) {
 	r.routes = addRoute(r.routes, path, "POST", handler)
 }
 
-func (r *Router) Put(path string, handler http.HandlerFunc) {
+func (r *Router) Put(path string, handler HandlerFunc) {
 	r.routes = addRoute(r.routes, path, "PUT", handler)
 }
 
-func (r *Router) Delete(path string, handler http.HandlerFunc) {
+func (r *Router) Delete(path string, handler HandlerFunc) {
 	r.routes = addRoute(r.routes, path, "DELETE", handler)
+}
+
+/*** Utils ***/
+
+func (r *Router) getRoutes() []route {
+	mountedRoutes := []route{}
+
+	for _, rt := range r.routes {
+		rt.handler = chain(rt.handler, r.middlewares)
+		mountedRoutes = append(mountedRoutes, rt)
+	}
+
+	for _, mr := range r.routers {
+		rtrRoutes := mr.router.getRoutes()
+		for _, rt := range rtrRoutes {
+			rt.path = mr.path + rt.path
+			rt.handler = chain(rt.handler, r.middlewares)
+			mountedRoutes = append(mountedRoutes, rt)
+		}
+	}
+
+	return mountedRoutes
 }

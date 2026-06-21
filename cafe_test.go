@@ -44,11 +44,11 @@ func TestApp_Get(t *testing.T) {
 		t.Errorf("Expected method GET, got %s", app.routes[0].method)
 	}
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/test/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -66,11 +66,11 @@ func TestApp_Post(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}
 	app.Post("/test", handler)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("POST", "/test/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusCreated {
 		t.Errorf("Expected status Created, got %d", rr.Code)
@@ -88,11 +88,11 @@ func TestApp_Put(t *testing.T) {
 		w.WriteHeader(http.StatusAccepted)
 	}
 	app.Put("/test", handler)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("PUT", "/test/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusAccepted {
 		t.Errorf("Expected status Accepted, got %d", rr.Code)
@@ -110,11 +110,11 @@ func TestApp_Delete(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}
 	app.Delete("/test", handler)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("DELETE", "/test/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
 		t.Errorf("Expected status No Content, got %d", rr.Code)
@@ -141,11 +141,11 @@ func TestApp_UseRouter(t *testing.T) {
 		t.Errorf("Expected mounted router path /api, got %s", app.routers[0].path)
 	}
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/sub/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -232,11 +232,11 @@ func TestRouter_UseRouter(t *testing.T) {
 
 	app := NewServer()
 	app.UseRouter("/main", parentRouter)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/main/sub/nested/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -286,12 +286,12 @@ func TestSetUpRouters_Order(t *testing.T) {
 	})
 	app.UseRouter("/api2", router2)
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	// Test root route
 	reqRoot := httptest.NewRequest("GET", "/root/", nil)
 	rrRoot := httptest.NewRecorder()
-	app.handler.ServeHTTP(rrRoot, reqRoot)
+	app.ServeHTTP(rrRoot, reqRoot)
 	if rrRoot.Code != http.StatusOK {
 		t.Errorf("Expected status OK for root, got %d", rrRoot.Code)
 	}
@@ -299,7 +299,7 @@ func TestSetUpRouters_Order(t *testing.T) {
 	// Test api1/sub1 route
 	reqSub1 := httptest.NewRequest("GET", "/api1/sub1/", nil)
 	rrSub1 := httptest.NewRecorder()
-	app.handler.ServeHTTP(rrSub1, reqSub1)
+	app.ServeHTTP(rrSub1, reqSub1)
 	if rrSub1.Code != http.StatusOK {
 		t.Errorf("Expected status OK for /api1/sub1, got %d", rrSub1.Code)
 	}
@@ -307,7 +307,7 @@ func TestSetUpRouters_Order(t *testing.T) {
 	// Test api2/sub2 route
 	reqSub2 := httptest.NewRequest("GET", "/api2/sub2/", nil)
 	rrSub2 := httptest.NewRecorder()
-	app.handler.ServeHTTP(rrSub2, reqSub2)
+	app.ServeHTTP(rrSub2, reqSub2)
 	if rrSub2.Code != http.StatusOK {
 		t.Errorf("Expected status OK for /api2/sub2, got %d", rrSub2.Code)
 	}
@@ -339,7 +339,7 @@ func TestHandlePathPattern(t *testing.T) {
 
 			req := httptest.NewRequest("GET", tt.expectedPath, nil)
 			rr := httptest.NewRecorder()
-			app.handler.ServeHTTP(rr, req)
+			app.ServeHTTP(rr, req)
 
 			if rr.Code != http.StatusOK {
 				t.Errorf("For path %s, expected status OK, got %d", tt.path, rr.Code)
@@ -351,7 +351,7 @@ func TestHandlePathPattern(t *testing.T) {
 			called = false
 			reqNotFound := httptest.NewRequest("GET", "/nonexistent/", nil)
 			rrNotFound := httptest.NewRecorder()
-			app.handler.ServeHTTP(rrNotFound, reqNotFound)
+			app.ServeHTTP(rrNotFound, reqNotFound)
 			if rrNotFound.Code != http.StatusNotFound {
 				t.Errorf("For non-matching path, expected status Not Found, got %d", rrNotFound.Code)
 			}
@@ -456,8 +456,8 @@ func TestSetUpMiddlewares(t *testing.T) {
 		}
 	}
 
-	mws := []middleware{mw1, mw2}
-	chainedHandler := setUpMiddlewares(finalHandler, mws)
+	mws := []Middleware{mw1, mw2}
+	chainedHandler := chain(finalHandler, mws)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -499,11 +499,11 @@ func TestApp_MiddlewareExecution(t *testing.T) {
 		w.Write([]byte("route handled"))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/test/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	expectedOrder := []string{"globalMw1", "globalMw2", "finalHandler"}
 	if len(callOrder) != len(expectedOrder) {
@@ -543,11 +543,11 @@ func TestRouter_MiddlewareExecution(t *testing.T) {
 	})
 
 	app.UseRouter("/api", rtr)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/subroute/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	expectedOrder := []string{"routerMw1", "routerMw2", "finalSubHandler"}
 	if len(callOrder) != len(expectedOrder) {
@@ -588,11 +588,11 @@ func TestAppAndRouter_MiddlewareCombinedExecution(t *testing.T) {
 	})
 
 	app.UseRouter("/data", rtr)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/data/item/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	expectedOrder := []string{"globalAppMw", "routerMw", "finalItemHandler"}
 	if len(callOrder) != len(expectedOrder) {
@@ -642,11 +642,11 @@ func TestDeepNestedMiddlewareCombinedExecution(t *testing.T) {
 	router1.UseRouter("/nested", router2) // router1 mounts router2 at /nested
 	app.UseRouter("/api", router1)        // app mounts router1 at /api
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/nested/resource/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	expectedOrder := []string{"globalAppMw", "router1Mw", "router2Mw", "finalResourceHandler"}
 
@@ -681,11 +681,11 @@ func TestMiddlewareCanHaltExecution(t *testing.T) {
 		w.Write([]byte("protected content"))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/protected/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	expectedOrder := []string{"haltingMw"}
 	if len(callOrder) != len(expectedOrder) {
@@ -727,11 +727,11 @@ func TestMiddlewareCanModifyRequest(t *testing.T) {
 		w.Write([]byte(modifiedValue))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/info/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -757,11 +757,11 @@ func TestApp_PathParameter(t *testing.T) {
 		w.Write([]byte("User ID: " + id))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/users/123/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -790,11 +790,11 @@ func TestApp_MultiplePathParameters(t *testing.T) {
 		w.Write(fmt.Appendf([]byte{}, "User: %s, Book: %s", userID, bookID))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/users/user456/books/book789/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -819,11 +819,11 @@ func TestRouter_PathParameter(t *testing.T) {
 	})
 
 	app.UseRouter("/api/users", userRouter)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/users/987/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -857,11 +857,11 @@ func TestRouter_NestedPathParameters(t *testing.T) {
 
 	mainRouter.UseRouter("/products/{productID}", subRouter)
 	app.UseRouter("/store", mainRouter)
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/store/products/prodA/reviews/revB/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -897,11 +897,11 @@ func TestPathParameter_WithMiddleware(t *testing.T) {
 		w.Write([]byte("Item ID: " + id))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/items/42/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK, got %d", rr.Code)
@@ -927,12 +927,12 @@ func TestApp_PathParameter_WithTrailingSlash(t *testing.T) {
 		w.Write([]byte("Widget ID: " + id))
 	})
 
-	app.setUpRouters()
+	app.SetUpRouters()
 
 	// Probar con trailing slash
 	req := httptest.NewRequest("GET", "/widgets/55/", nil)
 	rr := httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("Expected status OK for trailing slash, got %d", rr.Code)
@@ -945,9 +945,9 @@ func TestApp_PathParameter_WithTrailingSlash(t *testing.T) {
 	// Probar sin trailing slash (para asegurar que ambas funcionan)
 	req = httptest.NewRequest("GET", "/widgets/55", nil)
 	rr = httptest.NewRecorder()
-	app.handler.ServeHTTP(rr, req)
+	app.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusMovedPermanently {
+	if rr.Code != http.StatusTemporaryRedirect {
 		t.Errorf("Expected status OK for no trailing slash, got %d", rr.Code)
 	}
 }
