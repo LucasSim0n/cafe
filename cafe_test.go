@@ -11,17 +11,20 @@ import (
 
 func TestNewServer(t *testing.T) {
 	app := NewServer()
-	if app.handler == nil {
-		t.Error("Expected handler to be initialized, got nil")
-	}
-	if len(app.routers) != 0 {
-		t.Errorf("Expected no routers, got %d", len(app.routers))
+	if len(app.children) != 0 {
+		t.Errorf("Expected no children, got %d", len(app.children))
 	}
 	if len(app.routes) != 0 {
 		t.Errorf("Expected no routes, got %d", len(app.routes))
 	}
 	if len(app.middlewares) != 0 {
 		t.Errorf("Expected no global middlewares, got %d", len(app.middlewares))
+	}
+	if app.parent != nil {
+		t.Error("Expected no parent")
+	}
+	if app.prefix != "" {
+		t.Errorf("Expected no prefix, got %s", app.prefix)
 	}
 }
 
@@ -44,8 +47,6 @@ func TestApp_Get(t *testing.T) {
 		t.Errorf("Expected method GET, got %s", app.routes[0].method)
 	}
 
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("GET", "/test/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -66,8 +67,6 @@ func TestApp_Post(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}
 	app.Post("/test", handler)
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("POST", "/test/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -88,8 +87,6 @@ func TestApp_Put(t *testing.T) {
 		w.WriteHeader(http.StatusAccepted)
 	}
 	app.Put("/test", handler)
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("PUT", "/test/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -110,8 +107,6 @@ func TestApp_Delete(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}
 	app.Delete("/test", handler)
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("DELETE", "/test/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -126,22 +121,19 @@ func TestApp_Delete(t *testing.T) {
 
 func TestApp_UseRouter(t *testing.T) {
 	app := NewServer()
-	rtr := NewRouter()
 	var called bool
+	rtr := app.Group("/api")
 	rtr.Get("/sub", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.Write([]byte("sub-route"))
 	})
-	app.UseRouter("/api", rtr)
 
-	if len(app.routers) != 1 {
-		t.Errorf("Expected 1 mounted router, got %d", len(app.routers))
+	if len(app.children) != 1 {
+		t.Errorf("Expected 1 mounted router, got %d", len(app.children))
 	}
-	if app.routers[0].path != "/api" {
-		t.Errorf("Expected mounted router path /api, got %s", app.routers[0].path)
+	if app.children[0].prefix != "/api" {
+		t.Errorf("Expected mounted router path /api, got %s", app.children[0].prefix)
 	}
-
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/sub/", nil)
 	rr := httptest.NewRecorder()
@@ -161,24 +153,21 @@ func TestApp_UseRouter(t *testing.T) {
 
 func TestApp_UseRouter_DuplicatePath(t *testing.T) {
 	app := NewServer()
-	rtr1 := NewRouter()
-	rtr2 := NewRouter()
+	app.Group("/api")
+	app.Group("/api")
 
-	app.UseRouter("/api", rtr1)
-	app.UseRouter("/api", rtr2)
-
-	if len(app.routers) != 1 {
-		t.Errorf("Expected 1 mounted router due to duplicate path, got %d", len(app.routers))
+	if len(app.children) != 1 {
+		t.Errorf("Expected 1 mounted router due to duplicate path, got %d", len(app.children))
 	}
 }
 
 func TestNewRouter(t *testing.T) {
-	rtr := NewRouter()
+	rtr := NewRouter("")
 	if len(rtr.routes) != 0 {
 		t.Errorf("Expected no routes, got %d", len(rtr.routes))
 	}
-	if len(rtr.routers) != 0 {
-		t.Errorf("Expected no routers, got %d", len(rtr.routers))
+	if len(rtr.children) != 0 {
+		t.Errorf("Expected no routers, got %d", len(rtr.children))
 	}
 	if len(rtr.middlewares) != 0 {
 		t.Errorf("Expected no router middlewares, got %d", len(rtr.middlewares))
@@ -186,7 +175,7 @@ func TestNewRouter(t *testing.T) {
 }
 
 func TestRouter_Get(t *testing.T) {
-	rtr := NewRouter()
+	rtr := NewRouter("")
 	handler := func(w http.ResponseWriter, r *http.Request) {}
 	rtr.Get("/item", handler)
 
@@ -202,23 +191,22 @@ func TestRouter_Get(t *testing.T) {
 }
 
 func TestRouter_UseRouter(t *testing.T) {
-	parentRouter := NewRouter()
-	childRouter := NewRouter()
+	parentRouter := NewRouter("/main")
+	childRouter := parentRouter.Group("/sub")
 	var called bool
 	childRouter.Get("/nested", func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.Write([]byte("nested-route"))
 	})
-	parentRouter.UseRouter("/sub", childRouter)
 
-	if len(parentRouter.routers) != 1 {
-		t.Errorf("Expected 1 mounted router, got %d", len(parentRouter.routers))
+	if len(parentRouter.children) != 1 {
+		t.Errorf("Expected 1 mounted router, got %d", len(parentRouter.children))
 	}
-	if parentRouter.routers[0].path != "/sub" {
-		t.Errorf("Expected mounted router path /sub, got %s", parentRouter.routers[0].path)
+	if parentRouter.children[0].prefix != "/sub" {
+		t.Errorf("Expected mounted router path /sub, got %s", parentRouter.children[0].prefix)
 	}
 
-	allRoutes := parentRouter.getRoutes()
+	allRoutes := parentRouter.compileRoutes()
 	found := false
 	for _, r := range allRoutes {
 		if r.path == "/sub/nested" && r.method == "GET" {
@@ -231,9 +219,7 @@ func TestRouter_UseRouter(t *testing.T) {
 	}
 
 	app := NewServer()
-	app.UseRouter("/main", parentRouter)
-	app.SetUpRouters()
-
+	app.UseRouter(parentRouter)
 	req := httptest.NewRequest("GET", "/main/sub/nested/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -251,7 +237,7 @@ func TestRouter_UseRouter(t *testing.T) {
 }
 
 func TestAddRoute_Duplicate(t *testing.T) {
-	routes := []route{}
+	routes := []*Route{}
 	handler1 := func(w http.ResponseWriter, r *http.Request) {}
 	handler2 := func(w http.ResponseWriter, r *http.Request) {}
 
@@ -266,7 +252,7 @@ func TestAddRoute_Duplicate(t *testing.T) {
 	}
 }
 
-func TestSetUpRouters_Order(t *testing.T) {
+func TestRouters_Order(t *testing.T) {
 	app := NewServer()
 	var order []string
 
@@ -274,19 +260,15 @@ func TestSetUpRouters_Order(t *testing.T) {
 		order = append(order, "root")
 	})
 
-	router1 := NewRouter()
+	router1 := app.Group("/api1")
 	router1.Get("/sub1", func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "sub1")
 	})
-	app.UseRouter("/api1", router1)
 
-	router2 := NewRouter()
+	router2 := app.Group("/api2")
 	router2.Get("/sub2", func(w http.ResponseWriter, r *http.Request) {
 		order = append(order, "sub2")
 	})
-	app.UseRouter("/api2", router2)
-
-	app.SetUpRouters()
 
 	// Test root route
 	reqRoot := httptest.NewRequest("GET", "/root/", nil)
@@ -313,80 +295,25 @@ func TestSetUpRouters_Order(t *testing.T) {
 	}
 }
 
-func TestHandlePathPattern(t *testing.T) {
-	app := NewServer()
-	var called bool
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}
-
-	tests := []struct {
-		name         string
-		path         string
-		expectedPath string
-	}{
-		{"simple path", "/hello", "/hello/"},
-		{"path with trailing slash", "/world/", "/world/"},
-		{"nested path", "/api/v1/users", "/api/v1/users/"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app = NewServer()
-			called = false
-			app.handle(tt.path, "GET", handler)
-
-			req := httptest.NewRequest("GET", tt.expectedPath, nil)
-			rr := httptest.NewRecorder()
-			app.ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusOK {
-				t.Errorf("For path %s, expected status OK, got %d", tt.path, rr.Code)
-			}
-			if !called {
-				t.Errorf("For path %s, handler was not called", tt.path)
-			}
-
-			called = false
-			reqNotFound := httptest.NewRequest("GET", "/nonexistent/", nil)
-			rrNotFound := httptest.NewRecorder()
-			app.ServeHTTP(rrNotFound, reqNotFound)
-			if rrNotFound.Code != http.StatusNotFound {
-				t.Errorf("For non-matching path, expected status Not Found, got %d", rrNotFound.Code)
-			}
-			if called {
-				t.Errorf("For non-matching path, handler was unexpectedly called")
-			}
-		})
-	}
-}
-
 func TestRouter_GetRoutes_NestedRouters(t *testing.T) {
-	r1 := NewRouter()
+	r1 := NewRouter("")
+	r2 := r1.Group("/admin")
+	r3 := r2.Group("/sub")
+	r4 := r1.Group("/admin")
+
 	r1.Get("/users", func(w http.ResponseWriter, r *http.Request) {})
-
-	r2 := NewRouter()
 	r2.Get("/profile", func(w http.ResponseWriter, r *http.Request) {})
-
-	r3 := NewRouter()
 	r3.Get("/details", func(w http.ResponseWriter, r *http.Request) {})
-	r2.UseRouter("/sub", r3)
-
-	r1.UseRouter("/admin", r2)
-
-	r4 := NewRouter()
 	r4.Get("/settings", func(w http.ResponseWriter, r *http.Request) {})
-	r1.UseRouter("/admin", r4)
-
 	r1.Get("/billing", func(w http.ResponseWriter, r *http.Request) {})
 
-	allRoutes := r1.getRoutes()
+	allRoutes := r1.compileRoutes()
 
 	expectedPaths := map[string]bool{
 		"/users":             false,
 		"/admin/profile":     false,
 		"/admin/sub/details": false,
+		"/admin/settings":    false,
 		"/billing":           false,
 	}
 
@@ -404,7 +331,11 @@ func TestRouter_GetRoutes_NestedRouters(t *testing.T) {
 
 	if len(allRoutes) != len(expectedPaths) {
 		t.Errorf("Expected %d routes, got %d", len(expectedPaths), len(allRoutes))
-		t.Logf("Found routes: %+v", allRoutes)
+		var rString string
+		for _, r := range allRoutes {
+			rString += r.path + "!\n"
+		}
+		t.Logf("Found routes: %+v", rString)
 	}
 }
 
@@ -423,7 +354,7 @@ func TestApp_Use(t *testing.T) {
 }
 
 func TestRouter_Use(t *testing.T) {
-	rtr := NewRouter()
+	rtr := NewRouter("")
 	mw := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			next(w, r)
@@ -499,8 +430,6 @@ func TestApp_MiddlewareExecution(t *testing.T) {
 		w.Write([]byte("route handled"))
 	})
 
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("GET", "/test/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -523,7 +452,7 @@ func TestRouter_MiddlewareExecution(t *testing.T) {
 	app := NewServer()
 	var callOrder []string
 
-	rtr := NewRouter()
+	rtr := app.Group("/api")
 	rtr.Use(func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			callOrder = append(callOrder, "routerMw1")
@@ -541,9 +470,6 @@ func TestRouter_MiddlewareExecution(t *testing.T) {
 		callOrder = append(callOrder, "finalSubHandler")
 		w.Write([]byte("subroute handled"))
 	})
-
-	app.UseRouter("/api", rtr)
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/subroute/", nil)
 	rr := httptest.NewRecorder()
@@ -574,7 +500,7 @@ func TestAppAndRouter_MiddlewareCombinedExecution(t *testing.T) {
 		}
 	})
 
-	rtr := NewRouter()
+	rtr := app.Group("/data")
 	rtr.Use(func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			callOrder = append(callOrder, "routerMw")
@@ -586,9 +512,6 @@ func TestAppAndRouter_MiddlewareCombinedExecution(t *testing.T) {
 		callOrder = append(callOrder, "finalItemHandler")
 		w.Write([]byte("item handled"))
 	})
-
-	app.UseRouter("/data", rtr)
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/data/item/", nil)
 	rr := httptest.NewRecorder()
@@ -619,7 +542,7 @@ func TestDeepNestedMiddlewareCombinedExecution(t *testing.T) {
 		}
 	})
 
-	router1 := NewRouter()
+	router1 := app.Group("/api")
 	router1.Use(func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			callOrder = append(callOrder, "router1Mw")
@@ -627,7 +550,7 @@ func TestDeepNestedMiddlewareCombinedExecution(t *testing.T) {
 		}
 	})
 
-	router2 := NewRouter()
+	router2 := router1.Group("/nested")
 	router2.Use(func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			callOrder = append(callOrder, "router2Mw")
@@ -638,11 +561,6 @@ func TestDeepNestedMiddlewareCombinedExecution(t *testing.T) {
 		callOrder = append(callOrder, "finalResourceHandler")
 		w.Write([]byte("resource handled"))
 	})
-
-	router1.UseRouter("/nested", router2) // router1 mounts router2 at /nested
-	app.UseRouter("/api", router1)        // app mounts router1 at /api
-
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/nested/resource/", nil)
 	rr := httptest.NewRecorder()
@@ -680,8 +598,6 @@ func TestMiddlewareCanHaltExecution(t *testing.T) {
 		callOrder = append(callOrder, "finalHandler") // No debería ser llamada
 		w.Write([]byte("protected content"))
 	})
-
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/protected/", nil)
 	rr := httptest.NewRecorder()
@@ -727,8 +643,6 @@ func TestMiddlewareCanModifyRequest(t *testing.T) {
 		w.Write([]byte(modifiedValue))
 	})
 
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("GET", "/info/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -756,8 +670,6 @@ func TestApp_PathParameter(t *testing.T) {
 		}
 		w.Write([]byte("User ID: " + id))
 	})
-
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/users/123/", nil)
 	rr := httptest.NewRecorder()
@@ -790,8 +702,6 @@ func TestApp_MultiplePathParameters(t *testing.T) {
 		w.Write(fmt.Appendf([]byte{}, "User: %s, Book: %s", userID, bookID))
 	})
 
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("GET", "/users/user456/books/book789/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -807,7 +717,7 @@ func TestApp_MultiplePathParameters(t *testing.T) {
 
 func TestRouter_PathParameter(t *testing.T) {
 	app := NewServer()
-	userRouter := NewRouter()
+	userRouter := app.Group("/api/users")
 	expectedUserID := "987"
 
 	userRouter.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -817,9 +727,6 @@ func TestRouter_PathParameter(t *testing.T) {
 		}
 		w.Write([]byte("Router User ID: " + id))
 	})
-
-	app.UseRouter("/api/users", userRouter)
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/api/users/987/", nil)
 	rr := httptest.NewRecorder()
@@ -836,11 +743,12 @@ func TestRouter_PathParameter(t *testing.T) {
 
 func TestRouter_NestedPathParameters(t *testing.T) {
 	app := NewServer()
-	mainRouter := NewRouter()
-	subRouter := NewRouter()
 
 	expectedProductID := "prodA"
 	expectedReviewID := "revB"
+
+	mainRouter := app.Group("/store")
+	subRouter := mainRouter.Group("/products/{productID}")
 
 	subRouter.Get("/reviews/{reviewID}", func(w http.ResponseWriter, r *http.Request) {
 		productID := r.PathValue("productID") // Vendrá del router padre
@@ -854,10 +762,6 @@ func TestRouter_NestedPathParameters(t *testing.T) {
 		}
 		w.Write(fmt.Appendf([]byte{}, "Product: %s, Review: %s", productID, reviewID))
 	})
-
-	mainRouter.UseRouter("/products/{productID}", subRouter)
-	app.UseRouter("/store", mainRouter)
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/store/products/prodA/reviews/revB/", nil)
 	rr := httptest.NewRecorder()
@@ -897,8 +801,6 @@ func TestPathParameter_WithMiddleware(t *testing.T) {
 		w.Write([]byte("Item ID: " + id))
 	})
 
-	app.SetUpRouters()
-
 	req := httptest.NewRequest("GET", "/items/42/", nil)
 	rr := httptest.NewRecorder()
 	app.ServeHTTP(rr, req)
@@ -926,8 +828,6 @@ func TestApp_PathParameter_WithTrailingSlash(t *testing.T) {
 		}
 		w.Write([]byte("Widget ID: " + id))
 	})
-
-	app.SetUpRouters()
 
 	// Probar con trailing slash
 	req := httptest.NewRequest("GET", "/widgets/55/", nil)

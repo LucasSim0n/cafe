@@ -26,8 +26,6 @@ func TestPanicRecoveryMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	app.SetUpRouters()
-
 	httptest.NewRequest("GET", "/panic", nil)
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -46,8 +44,6 @@ func TestLoggerMiddleware(t *testing.T) {
 	app.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-
-	app.SetUpRouters()
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()

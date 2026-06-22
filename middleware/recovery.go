@@ -11,8 +11,8 @@ import (
 )
 
 type RecoveryConfig struct {
-	PrintStack bool
-	Output     io.Writer
+	WithStack bool
+	Output    io.Writer
 }
 
 func Recovery(cfg RecoveryConfig) cafe.Middleware {
@@ -23,7 +23,7 @@ func Recovery(cfg RecoveryConfig) cafe.Middleware {
 
 			defer func() {
 				if err := recover(); err != nil {
-					if cfg.PrintStack {
+					if cfg.WithStack {
 						fmt.Fprintf(cfg.Output, "panic recovered: %v\n%s", err, debug.Stack())
 					} else {
 						fmt.Fprintf(cfg.Output, "panic recovered: %v\n", err)
